@@ -15,11 +15,24 @@ class JnpApiController(http.Controller):
 
         uid = request.session.authenticate(request.db, login, password)
         if uid:
-            # Génération d'un token simple (à améliorer en prod)
-            import uuid
-            token = str(uuid.uuid4())
-            # Stocker le token en session ou en base si besoin
-            request.session['jnp_token'] = token
-            return {'token': token, 'uid': uid}
+                # Génération d'un token simple avec expiration (24h)
+                import uuid, datetime
+                token = str(uuid.uuid4())
+                expires_at = (datetime.datetime.utcnow() + datetime.timedelta(hours=24)).isoformat()
+                request.session['jnp_token'] = token
+                request.session['jnp_token_expires'] = expires_at
+                return {'token': token, 'uid': uid, 'expires_at': expires_at}
         else:
             return {'error': 'Identifiants invalides.'}
+
+        @http.route('/jnp/secure-test', type='json', auth='public', methods=['POST'], csrf=False)
+        def secure_test_api(self, **kwargs):
+            token = kwargs.get('token')
+            session_token = request.session.get('jnp_token')
+            expires_at = request.session.get('jnp_token_expires')
+            import datetime
+            if not token or not session_token or token != session_token:
+                return {'error': 'Token invalide ou manquant.'}
+            if not expires_at or datetime.datetime.utcnow() > datetime.datetime.fromisoformat(expires_at):
+                return {'error': 'Token expiré.'}
+            return {'message': 'Accès sécurisé autorisé !'}
