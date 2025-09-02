@@ -111,3 +111,122 @@ class JnpApiController(http.Controller):
     @require_token
     def secure_test_api(self, **kwargs):
         return {'message': 'Accès sécurisé autorisé !'}
+
+    # Mise à jour d'une entreprise
+    @http.route('/jnp/clients/<int:client_id>', type='http', auth='public', methods=['PUT'], csrf=False)
+    @require_token
+    def update_client(self, client_id, **kwargs):
+        try:
+            # Récupération des données JSON depuis le body
+            raw_data = request.httprequest.get_data().decode('utf-8')
+            data = json.loads(raw_data) if raw_data else {}
+
+            if not data:
+                return Response(json.dumps({'error': 'Aucune donnée fournie'}),
+                                content_type='application/json', status=400)
+
+            # Recherche du client
+            client = request.env['res.partner'].sudo().browse(client_id)
+            if not client.exists():
+                return Response(json.dumps({'error': 'Client introuvable'}),
+                                content_type='application/json', status=404)
+
+            # Mise à jour avec les champs fournis
+            allowed_fields = ['name', 'email', 'phone', 'street', 'city', 'zip']
+            vals = {field: data[field] for field in allowed_fields if field in data}
+
+            if not vals:
+                return Response(json.dumps({'error': 'Aucun champ valide fourni'}),
+                                content_type='application/json', status=400)
+
+            client.write(vals)
+
+            response = {
+                'message': 'Client mis à jour avec succès',
+                'id': client.id,
+                'updated_fields': vals
+            }
+            return Response(json.dumps(response), content_type='application/json', status=200)
+
+        except Exception as e:
+            return Response(json.dumps({'error': str(e)}),
+                            content_type='application/json', status=500)
+
+    # Récupération de toutes les entreprises
+    @http.route('/jnp/entreprises', type='http', auth='public', methods=['GET'], csrf=False)
+    @require_token
+    def get_entreprises(self, **kwargs):
+        try:
+            # Pagination
+            page = int(request.httprequest.args.get('page', 1))
+            limit = int(request.httprequest.args.get('limit', 10))
+            offset = (page - 1) * limit
+
+            # Recherche uniquement les entreprises
+            domain = [('is_company', '=', True)]
+            entreprises = request.env['res.partner'].sudo().search(domain, offset=offset, limit=limit)
+            total = request.env['res.partner'].sudo().search_count(domain)
+
+            data = []
+            for ent in entreprises:
+                data.append({
+                    'id': ent.id,
+                    'name': ent.name,
+                    'email': ent.email,
+                    'phone': ent.phone,
+                    'street': ent.street,
+                    'city': ent.city,
+                    'zip': ent.zip,
+                    'website': ent.website,
+                })
+
+            response = {
+                'entreprises': data,
+                'page': page,
+                'limit': limit,
+                'total': total
+            }
+            return Response(json.dumps(response), content_type='application/json', status=200)
+
+        except Exception as e:
+            return Response(json.dumps({'error': str(e)}),
+                            content_type='application/json', status=500)
+
+    # Création d’une entreprise
+    @http.route('/jnp/entreprises', type='http', auth='public', methods=['POST'], csrf=False)
+    @require_token
+    def create_entreprise(self, **kwargs):
+        try:
+            data = request.jsonrequest
+            if not data:
+                return Response(json.dumps({'error': 'Aucune donnée envoyée.'}),
+                                content_type='application/json', status=400)
+
+            # Champs obligatoires
+            if 'name' not in data:
+                return Response(json.dumps({'error': 'Le champ "name" est requis.'}),
+                                content_type='application/json', status=400)
+
+            vals = {
+                'is_company': True,
+                'name': data.get('name'),
+                'email': data.get('email'),
+                'phone': data.get('phone'),
+                'street': data.get('street'),
+                'city': data.get('city'),
+                'zip': data.get('zip'),
+                'website': data.get('website'),
+            }
+
+            entreprise = request.env['res.partner'].sudo().create(vals)
+
+            response = {
+                'message': 'Entreprise créée avec succès.',
+                'id': entreprise.id,
+                'values': vals
+            }
+            return Response(json.dumps(response), content_type='application/json', status=201)
+
+        except Exception as e:
+            return Response(json.dumps({'error': str(e)}),
+                            content_type='application/json', status=500)
