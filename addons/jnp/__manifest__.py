@@ -5,7 +5,9 @@
     'author': 'Edem',
     'category': 'Tools',
     'depends': ['base'],
-    'data': [],
+    'data': [
+        'security/ir.model.access.csv',
+    ],
     'installable': True,
     'application': True,
 }
