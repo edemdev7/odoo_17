@@ -1,9 +1,7 @@
-import json
 from odoo import http
-from odoo.http import request, Response
+from odoo.http import request
 
 class JnpApiController(http.Controller):
-    # Ajoutez cette route simple dans votre classe JnpApiController
-    @http.route('/jnp/simple-test', type='http', auth='public', methods=['GET'], csrf=False)
+    @http.route('/jnp/simple-test', type='json', auth='public', methods=['GET'], csrf=False)
     def simple_test(self):
-        return "Module JNP chargé avec succès !"
+        return {"message": "Module JNP chargé avec succès !"}
